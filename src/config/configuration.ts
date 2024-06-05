@@ -7,7 +7,7 @@ export default () => ({
     password: process.env.POSTGRES_PASSWORD,
     database: process.env.POSTGRES_DB,
     autoLoadEntities: true,
-    synchronize: true, // Do not use synchronize in production
+    synchronize: false, // Do not use synchronize in production
     migrations: ['dist/migrations/*.js'],
     cli: {
       migrationsDir: 'src/migrations',
