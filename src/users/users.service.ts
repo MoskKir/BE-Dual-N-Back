@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../models/user/user.entity';
+import { IUser } from './interfaces/user.interface';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
@@ -18,11 +20,35 @@ export class UsersService {
     return this.userRepository.findOneBy({ id });
   }
 
-  create(user: User): Promise<User> {
-    return this.userRepository.save(user);
+  async create(user: IUser): Promise<User> {
+    const { username, email, password } = user;
+
+    const existingUser = await this.userRepository.findOne({ where: { email } });
+
+    if (existingUser) {
+      throw new ConflictException('Email already in use');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = this.userRepository.create({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
+    return this.userRepository.save(newUser);
   }
 
   async remove(id: number): Promise<void> {
     await this.userRepository.delete(id);
+  }
+
+  async findByEmail(email: string) {
+    return this.userRepository.findOne({ where: { email }});
+  }
+
+  async comparePasswords(plainPassword: string, hashedPassword: string): Promise<boolean> {
+    return bcrypt.compare(plainPassword, hashedPassword);
   }
 }
