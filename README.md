@@ -21,4 +21,3 @@
 - `docker-compose.yml`: Docker Compose configuration for PostgreSQL.
 - `.env`: Your configuration settings.
 - `.env.example`: Example configuration file.
-```
