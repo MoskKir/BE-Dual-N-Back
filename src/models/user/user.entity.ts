@@ -8,15 +8,12 @@ import {
 } from 'typeorm';
 
 @Entity()
-@Unique(['username'])
+@Unique(['email'])
 export class User {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id: number;
 
-  @Column()
-  name: string;
-
-  @Column()
+  @Column({ unique: true, nullable: false })
   email: string;
 
   @Column({ length: 255 })
