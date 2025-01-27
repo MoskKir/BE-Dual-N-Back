@@ -22,4 +22,3 @@
 - `.env`: Your configuration settings.
 - `.env.example`: Example configuration file.
 ```
-Check account verivication
