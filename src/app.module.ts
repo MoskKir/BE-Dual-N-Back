@@ -7,6 +7,7 @@ import configuration from './config/configuration';
 
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './authentication/auth.module';
+import { MessageGateway } from './message/message.gateway';
 
 @Module({
   imports: [
@@ -25,6 +26,6 @@ import { AuthModule } from './authentication/auth.module';
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, MessageGateway],
 })
 export class AppModule {}
