@@ -9,6 +9,11 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './authentication/auth.module';
 import { MessageGateway } from './message/message.gateway';
 
+import { BullModule } from '@nestjs/bull';
+import { JobsModule } from './jobs/jobs.module';
+import { UserConfigModule } from './user-config/user-config.module';
+import { YoutubeModule } from './youtube/youtube.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -24,6 +29,15 @@ import { MessageGateway } from './message/message.gateway';
     }),
     UsersModule,
     AuthModule,
+    BullModule.forRoot({
+      redis: {
+        host: 'localhost',
+        port: 6379,
+      },
+    }),
+    JobsModule,
+    UserConfigModule,
+    YoutubeModule,
   ],
   controllers: [AppController],
   providers: [AppService, MessageGateway],

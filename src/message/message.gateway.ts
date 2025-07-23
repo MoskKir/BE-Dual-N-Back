@@ -6,14 +6,6 @@ import {
 import { Server } from 'socket.io';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
-// const messages = [
-//   'Hello, world!',
-//   'Welcome to the WebSocket demo!',
-//   'Random message here.',
-//   'How are you today?',
-//   'Another random message!'
-// ];
-
 const messages = [
   {
     title: "Using Cards Effectively",
