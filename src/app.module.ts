@@ -13,6 +13,8 @@ import { BullModule } from '@nestjs/bull';
 import { JobsModule } from './jobs/jobs.module';
 import { UserConfigModule } from './user-config/user-config.module';
 import { YoutubeModule } from './youtube/youtube.module';
+import { WebsitesModule } from './websites/websites.module';
+import { WebsiteAnalysisModule } from './website-analysis/website-analysis.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { YoutubeModule } from './youtube/youtube.module';
     JobsModule,
     UserConfigModule,
     YoutubeModule,
+    WebsitesModule,
+    WebsiteAnalysisModule,
   ],
   controllers: [AppController],
   providers: [AppService, MessageGateway],
