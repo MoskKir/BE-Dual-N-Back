@@ -54,3 +54,15 @@ npx typeorm migration:run
 ```bash
 npx typeorm migration:revert
 ```
+
+```
+docker compose up -d
+```
+
+```
+npm run start dev
+```
+
+```
+npm run migration:run
+```

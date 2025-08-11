@@ -1,19 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as fs from 'fs';
 import * as fsp from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import axios from 'axios';
-import Tesseract from 'tesseract.js';
+import * as Tesseract from 'tesseract.js';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { WebsiteAnalysis } from '../models/websites-analysis/WebsiteAnalysis';
+import { CreateWebsiteAnalysisDto } from './dto/website-analysis.dto';
 
 @Injectable()
 export class WebsiteAnalysisService {
   private readonly logger = new Logger(WebsiteAnalysisService.name);
   private readonly openai: OpenAI;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    @InjectRepository(WebsiteAnalysis) // Injects the User repository (DB table interface)
+    private websiteAnalysisRepository: Repository<WebsiteAnalysis>,
+  ) {
+
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
       this.logger.warn('OPENAI_API_KEY is not set. GPT step will fail without it.');
@@ -21,11 +30,18 @@ export class WebsiteAnalysisService {
     this.openai = new OpenAI({ apiKey });
   }
 
-  async extractTextFromImageUrl(imageUrl: string) {
+  async create(dto: CreateWebsiteAnalysisDto): Promise<WebsiteAnalysis> {
+    const entity = this.websiteAnalysisRepository.create(dto);
+    return this.websiteAnalysisRepository.save(entity);
+  }
+
+  async extractTextFromImageUrl(
+    imageUrl: string,
+    websiteAlias: string,
+    date: string,
+  ) {
     const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'extract-'));
     const tempImagePath = path.join(tmpDir, 'temp_image.jpg');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const outputTextPath = path.join(tmpDir, `extracted_text_${timestamp}.txt`);
 
     try {
       // 1) Download image
@@ -50,6 +66,8 @@ export class WebsiteAnalysisService {
 
       // 3) Process with GPT (two passes, like your sample)
       let finalText = extractedText;
+      let firstOut = '';
+      let secondOut = ''
       if (this.config.get<string>('OPENAI_API_KEY')) {
         const first = await this.openai.responses.create({
           model: 'gpt-5',
@@ -61,7 +79,7 @@ export class WebsiteAnalysisService {
             extractedText.slice(6000),
         });
 
-        const firstOut = (first as any).output_text ?? '';
+        // firstOut = (first as any).output_text ?? '';
 
         const second = await this.openai.responses.create({
           model: 'gpt-5',
@@ -73,17 +91,23 @@ export class WebsiteAnalysisService {
             `Сделай 10 предположений, что может произойти, и 10 — что не произойдёт.`,
         });
 
-        const secondOut = (second as any).output_text ?? '';
+        secondOut = (second as any).output_text ?? '';
         finalText = `${firstOut}\n\n${secondOut}`.trim();
       }
-
-      // 4) Save file
-      await fsp.writeFile(outputTextPath, finalText, 'utf8');
 
       // 5) Cleanup temp image (keep folder for output)
       await fsp.rm(tempImagePath, { force: true });
 
-      return { finalText, filePath: outputTextPath };
+      await this.create({
+        website_alias: websiteAlias,
+        date: date,
+        description: extractedText,
+        analysis: finalText,
+      });
+
+
+      // return null;
+      return { finalText };
     } catch (error: any) {
       this.logger.error(`Error: ${error?.message || error}`);
       throw error;
