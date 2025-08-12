@@ -35,6 +35,10 @@ export class WebsiteAnalysisService {
     return this.websiteAnalysisRepository.save(entity);
   }
 
+  async findBy(dto) {
+    return this.websiteAnalysisRepository.findBy(dto);
+  }
+
   async extractTextFromImageUrl(
     imageUrl: string,
     websiteAlias: string,
@@ -44,6 +48,15 @@ export class WebsiteAnalysisService {
     const tempImagePath = path.join(tmpDir, 'temp_image.jpg');
 
     try {
+      const existingResult = await this.findBy({
+        website_alias: websiteAlias,
+        date,
+      });
+
+      if (existingResult) {
+        return existingResult;
+      }
+
       // 1) Download image
       const response = await axios.get(imageUrl, { responseType: 'stream' });
       await new Promise<void>((resolve, reject) => {

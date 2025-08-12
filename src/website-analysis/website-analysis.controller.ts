@@ -23,12 +23,25 @@ export class WebsiteAnalysisController {
     return { success: true, ...result };
   }
 
-  // @Post()
-  // async postExtract(@Body() dto: WebsiteAnalysisDto) {
-  //   if (!dto?.imageUrl) {
-  //     throw new BadRequestException('imageUrl is required');
-  //   }
-  //   const result = await this.extractService.extractTextFromImageUrl(dto.imageUrl);
-  //   return { success: true, ...result };
-  // }
+  @Get('find')
+  async findByQuery(
+    @Query('imageUrl') imageUrl?: string,
+    @Query('websiteAlias') websiteAlias?: string,
+    @Query('date') date?: string,
+  ) {
+    if (!imageUrl && !websiteAlias && !date) {
+      throw new BadRequestException('At least one search parameter is required');
+    }
+
+    const result = await this.extractService.findBy({
+      website_alias: websiteAlias,
+      date,
+    });
+
+    return {
+      success: true,
+      count: result.length,
+      data: result,
+    };
+  }
 }
