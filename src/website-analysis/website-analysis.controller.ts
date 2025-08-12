@@ -15,10 +15,7 @@ export class WebsiteAnalysisController {
     if (!imageUrl) {
       throw new BadRequestException('imageUrl is required');
     }
-    console.log(imageUrl);
-    console.log(websiteAlias);
-    console.log(date);
-    // return { success: true, result: 'nice' };
+
     const result = await this.extractService.extractTextFromImageUrl(imageUrl, websiteAlias, date);
     return { success: true, ...result };
   }
