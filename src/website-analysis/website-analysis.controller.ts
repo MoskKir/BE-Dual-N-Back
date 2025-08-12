@@ -6,7 +6,7 @@ import { WebsiteAnalysisDto } from './dto/website-analysis.dto';
 export class WebsiteAnalysisController {
   constructor(private readonly extractService: WebsiteAnalysisService) {}
 
-  @Get()
+  @Get('create')
   async getExtract(
     @Query('imageUrl') imageUrl?: string,
     @Query('websiteAlias') websiteAlias?: string,
@@ -15,7 +15,7 @@ export class WebsiteAnalysisController {
     if (!imageUrl) {
       throw new BadRequestException('imageUrl is required');
     }
-
+    
     const result = await this.extractService.extractTextFromImageUrl(imageUrl, websiteAlias, date);
     return { success: true, ...result };
   }

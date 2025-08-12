@@ -53,7 +53,7 @@ export class WebsiteAnalysisService {
         date,
       });
 
-      if (existingResult) {
+      if (existingResult.length) {
         return existingResult;
       }
 
