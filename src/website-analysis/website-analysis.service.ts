@@ -22,10 +22,11 @@ export class WebsiteAnalysisService {
     @InjectRepository(WebsiteAnalysis) // Injects the User repository (DB table interface)
     private websiteAnalysisRepository: Repository<WebsiteAnalysis>,
   ) {
-
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
-      this.logger.warn('OPENAI_API_KEY is not set. GPT step will fail without it.');
+      this.logger.warn(
+        'OPENAI_API_KEY is not set. GPT step will fail without it.',
+      );
     }
     this.openai = new OpenAI({ apiKey });
   }
@@ -78,35 +79,74 @@ export class WebsiteAnalysisService {
       this.logger.log(`extractedText length: ${extractedText.length}`);
 
       // 3) Process with GPT (two passes, like your sample)
-      let finalText = extractedText;
-      let firstOut = '';
-      let secondOut = ''
-      if (this.config.get<string>('OPENAI_API_KEY')) {
-        const first = await this.openai.responses.create({
-          model: 'gpt-5',
-          input: `Здесь представлен результат автоматического сканирования изображения с новостного сайта.\n` +
-            `Попытайся структурировать данный набор слов и символов.\n` +
-            `Структурируй данный текст и выдели из него основную информацию.\n` +
-            `Структурированный и кратко изложенный текст из оригинального хаотичного фрагмента ` +
-            `будет представлять собой подборку статей и тем:\n\n` +
-            extractedText.slice(6000),
-        });
+      // let finalText = extractedText;
 
-        // firstOut = (first as any).output_text ?? '';
+      const prompt = `
+        You are an information extractor.
 
-        const second = await this.openai.responses.create({
-          model: 'gpt-5',
-          input: `${firstOut}\n\n` +
-            `Сделай разбор по конкретным темам (политика, экономика, международные темы и т. д.).\n` +
-            `Дополнительно предоставь переводы для заголовков статей.\n` +
-            `Дай 10 положительных и 10 негативных выводов и для каждого пункта предоставь "сигнальную систему" из ещё 5 пунктов — на что обратить внимание ` +
-            `при отслеживании прогресса по конкретному пункту.\n` +
-            `Сделай 10 предположений, что может произойти, и 10 — что не произойдёт.`,
-        });
+        Task:
+        - From the INPUT TEXT, extract:
+          1) publication (the news outlet / magazine name),
+          2) headlines (main article titles) in order of appearance.
 
-        secondOut = (second as any).output_text ?? '';
-        finalText = `${firstOut}\n\n${secondOut}`.trim();
-      }
+        Rules:
+        - Headlines are short meaning-carrying phrases (usually Title Case).
+        - Ignore menus, buttons, promos, dates, “subscribe/log in”, “current issue”, prices, event ads, podcast promos, author names, bylines, and photo captions.
+        - Do NOT include subheadings or taglines; only the main titles.
+        - Clean OCR noise: join broken lines, fix hyphenated line breaks, drop stray symbols.
+        - If unsure whether a line is a real headline, exclude it.
+        - If the publication cannot be found, return publication = "".
+        - Output MUST match the provided JSON schema exactly. No extra fields, no commentary.
+
+        INPUT TEXT:
+        <<<
+        ${extractedText.slice(0, 6000)}
+        >>>
+
+        IGNORE any line that matches these patterns (case-insensitive):
+        - subscribe|log in|current issue|archive|table of contents|menu
+        - newsletters|podcast|books|affairs|spotlight
+        - most read|editor's pick|view all|follow the podcast
+      `;
+
+      const firstStep = await this.openai.responses.create({
+        model: 'gpt-5',
+        input: prompt,
+      });
+      this.logger.log(`finalText length: ${firstStep.output_text || 0}`);
+      console.log('firstStep.output_text: ', firstStep.output_text);
+
+      let finalText = firstStep.output_text ?? '';
+      // let firstOut = '';
+      // let secondOut = '';
+      // if (this.config.get<string>('OPENAI_API_KEY')) {
+      //   const first = await this.openai.responses.create({
+      //     model: 'gpt-5',
+      //     input:
+      //       `Здесь представлен результат автоматического сканирования изображения с новостного сайта. Используй только эти данные, что бы уменьшить галюцинации.\n` +
+      //       `Попытайся структурировать данный набор слов и символов.\n` +
+      //       `Структурируй данный текст и выдели из него основную информацию. Меня интересует только то что представленно в данном тексте\n` +
+      //       `Структурированный и кратко изложенный текст из оригинального хаотичного фрагмента. Используй только эти данные, что бы уменьшить галюцинации.` +
+      //       `будет представлять собой подборку статей и тем:\n\n` +
+      //       finalText,
+      //   });
+
+      //   firstOut = (first as any).output_text ?? '';
+
+      //   const second = await this.openai.responses.create({
+      //     model: 'gpt-5',
+      //     input:
+      //       `${firstOut}\n\n` +
+      //       `Сделай разбор по конкретным темам (политика, экономика, международные темы и т. д.).\n` +
+      //       `Дополнительно предоставь переводы для заголовков статей.\n` +
+      //       `Дай 10 положительных и 10 негативных выводов и для каждого пункта предоставь "сигнальную систему" из ещё 5 пунктов — на что обратить внимание ` +
+      //       `при отслеживании прогресса по конкретному пункту.\n` +
+      //       `Сделай 10 предположений, что может произойти, и 10 — что не произойдёт. Используй только эти данные, `,
+      //   });
+
+      //   secondOut = (second as any).output_text ?? '';
+      //   finalText = `${firstOut}\n\n${secondOut}`.trim();
+      // }
 
       // 5) Cleanup temp image (keep folder for output)
       await fsp.rm(tempImagePath, { force: true });
@@ -115,9 +155,8 @@ export class WebsiteAnalysisService {
         website_alias: websiteAlias,
         date: date,
         description: extractedText,
-        analysis: finalText,
+        analysis: finalText || '',
       });
-
 
       // return null;
       return { finalText };
