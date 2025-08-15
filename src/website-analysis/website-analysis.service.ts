@@ -31,8 +31,8 @@ export class WebsiteAnalysisService {
     this.openai = new OpenAI({ apiKey });
   }
 
-  async create(dto: CreateWebsiteAnalysisDto): Promise<WebsiteAnalysis> {
-    const entity = this.websiteAnalysisRepository.create(dto);
+  async create(dto: CreateWebsiteAnalysisDto): Promise<any> {
+    const entity = this.websiteAnalysisRepository.create(dto as any);
     return this.websiteAnalysisRepository.save(entity);
   }
 
@@ -55,7 +55,9 @@ export class WebsiteAnalysisService {
       });
 
       if (existingResult.length) {
-        return existingResult;
+        // return existingResult;
+        const result = existingResult[0];
+        return { data: [{ ...result }] };
       }
 
       // 1) Download image
@@ -68,18 +70,15 @@ export class WebsiteAnalysisService {
       });
 
       // 2) OCR with Tesseract (eng + rus)
-      const result = await Tesseract.recognize(tempImagePath, 'eng+rus', {
+      const ocrResult = await Tesseract.recognize(tempImagePath, 'eng+rus', {
         logger: (m) => {
           if (m?.status && typeof m.progress === 'number') {
             this.logger.debug(`${m.status}: ${Math.round(m.progress * 100)}%`);
           }
         },
       });
-      const extractedText = result.data.text || '';
+      const extractedText = ocrResult.data.text || '';
       this.logger.log(`extractedText length: ${extractedText.length}`);
-
-      // 3) Process with GPT (two passes, like your sample)
-      // let finalText = extractedText;
 
       const prompt = `
         You are an information extractor.
@@ -114,52 +113,125 @@ export class WebsiteAnalysisService {
         input: prompt,
       });
       this.logger.log(`finalText length: ${firstStep.output_text || 0}`);
-      console.log('firstStep.output_text: ', firstStep.output_text);
 
-      let finalText = firstStep.output_text ?? '';
-      // let firstOut = '';
-      // let secondOut = '';
-      // if (this.config.get<string>('OPENAI_API_KEY')) {
-      //   const first = await this.openai.responses.create({
-      //     model: 'gpt-5',
-      //     input:
-      //       `Здесь представлен результат автоматического сканирования изображения с новостного сайта. Используй только эти данные, что бы уменьшить галюцинации.\n` +
-      //       `Попытайся структурировать данный набор слов и символов.\n` +
-      //       `Структурируй данный текст и выдели из него основную информацию. Меня интересует только то что представленно в данном тексте\n` +
-      //       `Структурированный и кратко изложенный текст из оригинального хаотичного фрагмента. Используй только эти данные, что бы уменьшить галюцинации.` +
-      //       `будет представлять собой подборку статей и тем:\n\n` +
-      //       finalText,
-      //   });
+      const firstStepJson = JSON.parse(firstStep.output_text);
 
-      //   firstOut = (first as any).output_text ?? '';
+      const secondStepPrompt = `
+        You are an classifier, and analyst.
 
-      //   const second = await this.openai.responses.create({
-      //     model: 'gpt-5',
-      //     input:
-      //       `${firstOut}\n\n` +
-      //       `Сделай разбор по конкретным темам (политика, экономика, международные темы и т. д.).\n` +
-      //       `Дополнительно предоставь переводы для заголовков статей.\n` +
-      //       `Дай 10 положительных и 10 негативных выводов и для каждого пункта предоставь "сигнальную систему" из ещё 5 пунктов — на что обратить внимание ` +
-      //       `при отслеживании прогресса по конкретному пункту.\n` +
-      //       `Сделай 10 предположений, что может произойти, и 10 — что не произойдёт. Используй только эти данные, `,
-      //   });
+        TASKS:
+        1) From the INPUT TEXT, extract:
+          - publication: the news outlet / magazine name
+          - headlines: main article titles ONLY (no taglines/subtitles)
 
-      //   secondOut = (second as any).output_text ?? '';
-      //   finalText = `${firstOut}\n\n${secondOut}`.trim();
-      // }
+        2) Classify each headline into ONE topic bucket:
+          - Politics
+          - Economy
+          - International
+          - Security_Defense
+          - Technology_Science
+          - Society_Culture
+          - Environment_Climate
+          - Business_Markets
+          - Law_Justice
+          - Opinion_Editorial
+          - Other
 
-      // 5) Cleanup temp image (keep folder for output)
+        3) Provide a Russian translation for each headline (title_ru).
+
+        4) Analytical block:
+          - Create 10 positive conclusions (positive_conclusions) based ONLY on the extracted headlines.
+          - Create 10 negative conclusions (negative_conclusions) based ONLY on the extracted headlines.
+          - For each conclusion, provide a "signal system" — exactly 5 concise monitoring points that indicate progress or change related to that conclusion.
+          - Create 10 predictions about what IS LIKELY to happen (will_happen) and 10 predictions about what is UNLIKELY to happen (will_not_happen), using ONLY the extracted headlines as source material.
+
+        RULES:
+        - Headlines: short, meaning-carrying phrases (Title Case or clear sentence case).
+        - Ignore: menus, buttons, promos, prices, dates, “subscribe/log in”, “current issue”, “table of contents”, “view all”, “most read”, “editor's pick”, event ads, podcast promos, newsletter prompts, author names/bylines, photo captions.
+        - Do NOT include subheadings/taglines; only the main title.
+        - Clean OCR noise: join broken/wrapped lines; fix hyphenated line breaks; remove stray symbols and emojis; normalize whitespace; trim punctuation.
+        - Deduplicate similar/identical headlines.
+        - If unsure about a headline, exclude it.
+        - Use only INPUT TEXT for all conclusions and predictions — no outside knowledge.
+
+        OUTPUT:
+        MUST match this JSON schema exactly:
+
+        {
+          "publication": "string",
+          "topics": {
+            "Politics": [{"title": "string", "title_ru": "string"}],
+            "Economy": [{"title": "string", "title_ru": "string"}],
+            "International": [{"title": "string", "title_ru": "string"}],
+            "Security_Defense": [{"title": "string", "title_ru": "string"}],
+            "Technology_Science": [{"title": "string", "title_ru": "string"}],
+            "Society_Culture": [{"title": "string", "title_ru": "string"}],
+            "Environment_Climate": [{"title": "string", "title_ru": "string"}],
+            "Business_Markets": [{"title": "string", "title_ru": "string"}],
+            "Law_Justice": [{"title": "string", "title_ru": "string"}],
+            "Opinion_Editorial": [{"title": "string", "title_ru": "string"}],
+            "Other": [{"title": "string", "title_ru": "string"}]
+          },
+          "analysis": {
+            "positive_conclusions": [
+              {"conclusion": "string", "signals": ["string", "string", "string", "string", "string"]},
+            ],
+            "negative_conclusions": [
+              {"conclusion": "string", "signals": ["string", "string", "string", "string", "string"]}
+            ],
+            "will_happen": ["string"],
+            "will_not_happen": ["string"]
+          }
+          "analysis_ru": {
+            "positive_conclusions": [
+              {"conclusion": "string", "signals": ["string", "string", "string", "string", "string"]},
+            ],
+            "negative_conclusions": [
+              {"conclusion": "string", "signals": ["string", "string", "string", "string", "string"]}
+            ],
+            "will_happen": ["string"],
+            "will_not_happen": ["string"]
+          }
+        }
+
+        INPUT TEXT:
+        <<<
+        ${firstStepJson.headlines.join('\n')}
+        >>>
+
+        IGNORE any line matching these (case-insensitive):
+        subscribe|log[ -]?in|current issue|archive|table of contents|menu|newsletters?|books?|podcast|spotlight|most read|editor'?s pick|view all|follow (the )?podcast|full table of contents|listen to (the )?episode|book reviews?|subscribe( now)?|download (the )?app|backstory|about|contact|permissions|submissions|leave us feedback|graduate school forum|event|summit|conference|tickets?|pricing|CEO summit|advertisement|ad|
+        ^\s*(by|author|review by)\b|^\s*\$?\d+(\.\d{2})?\s*$
+
+        LANGUAGE:
+        - Translate titles to Russian in "title_ru".
+        - Translate analysis to Russian in "analysis_ru".
+      `;
+
+      const secondStep = await this.openai.responses.create({
+        model: 'gpt-5',
+        input: secondStepPrompt,
+      });
+
+      const secondStepOutput = secondStep.output_text || '';
+      const result = JSON.parse(secondStepOutput);
+
       await fsp.rm(tempImagePath, { force: true });
 
       await this.create({
         website_alias: websiteAlias,
         date: date,
-        description: extractedText,
-        analysis: finalText || '',
+        publication: firstStepJson.publication || '',
+        headlines: firstStepJson.headlines || [],
+        negative_conclusions: result.analysis?.negative_conclusions || [],
+        positive_conclusions: result.analysis?.positive_conclusions || [],
+        will_happen: result.analysis?.will_happen || [],
+        will_not_happen: result.analysis?.will_not_happen || [],
+        analysis_ru: result.analysis_ru || {},
+        raw_response: { ...firstStepJson, result },
       });
 
-      // return null;
-      return { finalText };
+      return { result: { ...firstStepJson, result } };
     } catch (error: any) {
       this.logger.error(`Error: ${error?.message || error}`);
       throw error;

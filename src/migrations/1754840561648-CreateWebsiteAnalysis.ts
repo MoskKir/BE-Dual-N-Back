@@ -1,35 +1,24 @@
-import {
-  MigrationInterface,
-  QueryRunner,
-  Table,
-  TableIndex,
-} from 'typeorm';
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
 
-export class CreateWebsiteAnalysisTable1699999999999 implements MigrationInterface {
+export class CreateWebsiteAnalysisTable1723728000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const dbType = queryRunner.connection.options.type;
-    const isPostgres = dbType === 'postgres';
-    const isMysql = dbType === 'mysql' || dbType === 'mariadb';
-
-    const idType = isPostgres ? 'integer' : 'int';
-    const timestampDefault = isPostgres ? 'now()' : 'CURRENT_TIMESTAMP';
-
     await queryRunner.createTable(
       new Table({
         name: 'website_analysis',
         columns: [
           {
             name: 'id',
-            type: idType,
+            type: 'int',
+            unsigned: true,
             isPrimary: true,
             isGenerated: true,
             generationStrategy: 'increment',
-            unsigned: !isPostgres,
           },
           {
             name: 'website_alias',
             type: 'varchar',
-            length: '255',
             isNullable: false,
           },
           {
@@ -38,44 +27,65 @@ export class CreateWebsiteAnalysisTable1699999999999 implements MigrationInterfa
             isNullable: false,
           },
           {
-            name: 'description',
+            name: 'publication',
             type: 'text',
             isNullable: true,
           },
           {
-            name: 'analysis',
+            name: 'headlines',
             type: 'text',
+            isArray: true,
+            isNullable: true,
+          },
+          {
+            name: 'negative_conclusions',
+            type: 'jsonb',
+            isNullable: true,
+          },
+          {
+            name: 'positive_conclusions',
+            type: 'jsonb',
+            isNullable: true,
+          },
+          {
+            name: 'will_happen',
+            type: 'text',
+            isArray: true,
+            isNullable: true,
+          },
+          {
+            name: 'will_not_happen',
+            type: 'text',
+            isArray: true,
+            isNullable: true,
+          },
+          {
+            name: 'analysis_ru',
+            type: 'jsonb',
+            isNullable: true,
+          },
+          {
+            name: 'raw_response',
+            type: 'jsonb',
             isNullable: true,
           },
           {
             name: 'created_at',
             type: 'timestamp',
-            default: timestampDefault,
-            isNullable: false,
+            default: 'CURRENT_TIMESTAMP',
           },
           {
             name: 'updated_at',
             type: 'timestamp',
-            default: timestampDefault,
-            onUpdate: isMysql ? 'CURRENT_TIMESTAMP' : undefined,
-            isNullable: false,
+            default: 'CURRENT_TIMESTAMP',
           },
         ],
       }),
       true,
     );
-
-    await queryRunner.createIndex(
-      'website_analysis',
-      new TableIndex({
-        name: 'IDX_website_analysis_alias',
-        columnNames: ['website_alias'],
-      }),
-    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropIndex('website_analysis', 'IDX_website_analysis_alias');
     await queryRunner.dropTable('website_analysis');
   }
 }

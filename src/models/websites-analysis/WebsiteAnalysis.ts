@@ -19,10 +19,28 @@ export class WebsiteAnalysis {
   date: string;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  publication: string;
 
-  @Column({ type: 'text', nullable: true })
-  analysis: string;
+  @Column('text', { array: true, nullable: true })
+  headlines: string[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  negative_conclusions: unknown[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  positive_conclusions: unknown[] | null;
+
+  @Column('text', { array: true, nullable: true })
+  will_happen: string[];
+
+  @Column('text', { array: true, nullable: true })
+  will_not_happen: string[];
+
+  @Column({ type: 'jsonb', nullable: true })
+  analysis_ru: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  raw_response: Record<string, any> | null;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
