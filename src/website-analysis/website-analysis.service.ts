@@ -109,7 +109,7 @@ export class WebsiteAnalysisService {
       `;
 
       const firstStep = await this.openai.responses.create({
-        model: 'gpt-5',
+        model: 'gpt-4',
         input: prompt,
       });
       this.logger.log(`finalText length: ${firstStep.output_text || 0}`);
@@ -209,7 +209,7 @@ export class WebsiteAnalysisService {
       `;
 
       const secondStep = await this.openai.responses.create({
-        model: 'gpt-5',
+        model: 'gpt-4',
         input: secondStepPrompt,
       });
 
